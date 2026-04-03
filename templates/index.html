@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>COVID-19 Country Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6f9;
+      color: #333;
+      padding: 20px;
+    }
+
+    header {
+      background: #1a3a5c;
+      color: white;
+      padding: 20px 30px;
+      border-radius: 10px;
+      margin-bottom: 24px;
+    }
+
+    header h1 { font-size: 1.6rem; }
+    header p  { font-size: 0.9rem; opacity: 0.8; margin-top: 4px; }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+
+    .controls label { font-weight: 600; margin-right: 6px; }
+
+    .controls select {
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1rem;
+      background: white;
+      cursor: pointer;
+    }
+
+    #chart-container {
+      background: white;
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 24px;
+    }
+
+    #chart { width: 100%; height: 450px; }
+
+    .insights {
+      background: white;
+      border-radius: 10px;
+      padding: 24px 28px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      line-height: 1.7;
+    }
+
+    .insights h2 {
+      font-size: 1.2rem;
+      color: #1a3a5c;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #e0e6f0;
+      padding-bottom: 6px;
+    }
+
+    .insights p { margin-bottom: 10px; font-size: 0.95rem; }
+
+    .caveat {
+      background: #fff8e1;
+      border-left: 4px solid #f9a825;
+      padding: 10px 14px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      margin-top: 10px;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 0.8rem;
+      color: #888;
+    }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.2rem; }
+      #chart    { height: 300px; }
+      .controls { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🌍 COVID-19 Interactive Country Dashboard</h1>
+  <p>Data range: {{ date_min }} – {{ date_max }}</p>
+</header>
+
+<div class="controls">
+  <div>
+    <label for="countrySelect">Country:</label>
+    <select id="countrySelect">
+      {% for c in countries %}
+        <option value="{{ c }}" {% if c == 'Canada' %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="metricSelect">Metric:</label>
+    <select id="metricSelect">
+      <option value="new_cases">New Cases</option>
+      <option value="new_vaccinations">New Vaccinations</option>
+      <option value="new_deaths">New Deaths</option>
+    </select>
+  </div>
+</div>
+
+<div id="chart-container">
+  <div id="chart"></div>
+</div>
+
+<section class="insights">
+  <h2>📊 Insights</h2>
+  <p>
+    The chart above shows monthly COVID-19 data for the selected country. Select a different country or metric
+    using the dropdowns.
+  </p>
+  <p>
+    <strong>Key trends observed:</strong> Vaccination rollouts typically began in early 2021. You can see
+    that sometimes there is a large spike in reported vaccinations because of the campaign drives. New deaths
+    generally lagged new cases by several weeks.
+  </p>
+  <p>
+    <strong>Design choices:</strong> Missing values were filled with 0 because no report probably means no confirmed
+    cases that period. Extreme spikes above the 99th percentile per country were capped to reduce visual distortion
+    from data-entry anomalies. A smooth line chart was chosen over bar charts to emphasize trend over time. Colors
+    use high-contrast palettes for readability.
+  </p>
+  <div class="caveat">
+    ⚠️ <strong>Correlation ≠ Causation:</strong> Rising vaccinations alongside rising cases in some periods
+    does not mean vaccines caused cases because both were driven by independent factors like reporting
+    changes and population behavior. Always consider confounding variables before drawing conclusions from
+    this data.
+  </div>
+</section>
+
+<footer>
+  Data: Our World in Data COVID-19 Dataset (Sample)
+</footer>
+
+<script>
+  const countrySelect = document.getElementById("countrySelect");
+  const metricSelect  = document.getElementById("metricSelect");
+
+  const metricLabels = {
+    new_cases:         "New Cases",
+    new_vaccinations:  "New Vaccinations",
+    new_deaths:        "New Deaths"
+  };
+
+  const metricColors = {
+    new_cases:        "#e63946",
+    new_vaccinations: "#2a9d8f",
+    new_deaths:       "#6c757d"
+  };
+
+  function fetchAndPlot() {
+    const country = countrySelect.value;
+    const metric  = metricSelect.value;
+
+    fetch(`/data?country=${encodeURIComponent(country)}&metric=${encodeURIComponent(metric)}`)
+      .then(r => r.json())
+      .then(data => {
+        const trace = {
+          x: data.date,
+          y: data[metric],
+          type: "scatter",
+          mode: "lines+markers",
+          name: metricLabels[metric],
+          line:   { color: metricColors[metric], width: 2.5 },
+          marker: { size: 5 }
+        };
+
+        const layout = {
+          title: {
+            text: `${metricLabels[metric]} Over Time — ${country}`,
+            font: { size: 16 }
+          },
+          xaxis: {
+            title: "Date",
+            tickformat: "%b %Y",
+            showgrid: true,
+            gridcolor: "#eee"
+          },
+          yaxis: {
+            title: metricLabels[metric],
+            showgrid: true,
+            gridcolor: "#eee"
+          },
+          legend:     { orientation: "h", y: -0.2 },
+          margin:     { t: 60, l: 60, r: 20, b: 80 },
+          plot_bgcolor:  "white",
+          paper_bgcolor: "white",
+          hovermode:  "x unified"
+        };
+
+        Plotly.newPlot("chart", [trace], layout, { responsive: true });
+      });
+  }
+
+  countrySelect.addEventListener("change", fetchAndPlot);
+  metricSelect.addEventListener("change",  fetchAndPlot);
+
+  // Load default on page open
+  fetchAndPlot();
+</script>
+
+</body>
+</html>
