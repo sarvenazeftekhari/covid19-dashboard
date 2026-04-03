@@ -23,15 +23,6 @@ python app.py
 ### 4. Open in browser
 Go to: http://127.0.0.1:5000
 
-## File Structure
-
-covid_app/
-├── app.py
-├── COVID_Country_Sample.csv
-├── README.md
-└── templates/
-    └── index.html
-
 ## Features
 - Interactive line chart switchable by country and metric
 - Metrics: New Cases, New Vaccinations, New Deaths
